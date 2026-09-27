@@ -25,3 +25,6 @@ pnpm-debug.log*
 
 # external Markdown notes repository
 external-notes/
+
+# generated video assets from the external notes repository
+public/notes-assets/
