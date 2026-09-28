@@ -4,7 +4,7 @@ HaloMoon 是一个使用 Astro 生成的轻量中文静态博客。
 
 ## 内容仓库
 
-- 博客源码：[Hole333/HolyLinux](https://github.com/Hole333/HolyLinux)
+- 博客源码：[Hole333/HaloMoon](https://github.com/Hole333/HolyLinux)
 - Markdown 文章：[Hole333/HaloMoon-Notes](https://github.com/Hole333/HaloMoon-Notes)
 
 Markdown 的父文件夹作为分类，文件路径映射到统一文章栏目：
