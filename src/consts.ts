@@ -5,6 +5,5 @@ export const SOCIAL_LINKS = {
 	x: '',
 	telegram: '',
 	whatsapp: '',
-	rss: '/rss.xml',
 };
 

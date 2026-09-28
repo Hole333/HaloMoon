@@ -28,3 +28,14 @@ external-notes/
 
 # generated video assets from the external notes repository
 public/notes-assets/
+
+/public/wallpapers/home.mp4
+
+# Retired wallpaper/cursor exports; keep local originals out of releases.
+/public/cursors/ocean-link.svg
+/public/cursors/ocean-pointer.svg
+/public/wallpapers/home-poster.webp
+/public/wallpapers/ocean-desktop-4k-v3.mp4
+/public/wallpapers/ocean-desktop-v2.mp4
+/public/wallpapers/ocean-frame-v2.webp
+/public/wallpapers/preview-source.gif

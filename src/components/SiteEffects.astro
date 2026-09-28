@@ -1,117 +1,89 @@
 <script>
-	type TrailPoint = { x: number; y: number; born: number };
-	type Particle = { x: number; y: number; vx: number; vy: number; born: number };
-	type SiteEffectsController = { init: () => void; cleanup: () => void };
-	type SiteWindow = Window & { __haloSiteEffects?: SiteEffectsController };
-	const siteWindow = window as SiteWindow;
+  type SiteEffectsController = { init: () => void; cleanup: () => void };
+  type SiteWindow = Window & { __haloSiteEffects?: SiteEffectsController };
+  const siteWindow = window as SiteWindow;
+  if (!siteWindow.__haloSiteEffects) {
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+    const effects = new Map<HTMLElement, number>();
+    const easeOut = 'cubic-bezier(0.23, 1, 0.32, 1)';
+    let lastTrail = { x: 0, y: 0, time: 0 };
+    let mistPhase = 0;
+    const removeEffect = (element: HTMLElement) => {
+      clearTimeout(effects.get(element));
+      element.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
+      element.remove();
+      effects.delete(element);
+    };
+    const cleanup = () => {
+      for (const element of effects.keys()) removeEffect(element);
+      lastTrail = { x: 0, y: 0, time: 0 };
+    };
+    const allowed = () => !document.hidden && !reduceMotion.matches && finePointer.matches;
+    const place = (kind: string, x: number, y: number, lifetime: number) => {
+      while (effects.size >= 18) removeEffect(effects.keys().next().value!);
+      const element = document.createElement('span');
+      element.className = kind;
+      element.setAttribute('aria-hidden', 'true');
+      element.style.left = x + 'px';
+      element.style.top = y + 'px';
+      const dark = document.body.classList.contains('home-page') || document.documentElement.dataset.theme === 'dark';
+      element.style.setProperty('--moon-rgb', dark ? '219,230,245' : '105,127,158');
+      document.body.append(element);
+      effects.set(element, window.setTimeout(() => removeEffect(element), lifetime));
+      return element;
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (!allowed() || event.pointerType !== 'mouse' || event.buttons) return;
+      const now = performance.now();
+      const dx = lastTrail.time ? event.clientX-lastTrail.x : 0;
+      const dy = lastTrail.time ? event.clientY-lastTrail.y : 0;
+      const distance = Math.hypot(dx,dy);
+      if (lastTrail.time && (now-lastTrail.time < 48 || distance < 7)) return;
+      lastTrail = { x: event.clientX, y: event.clientY, time: now };
+      const direction = distance ? Math.atan2(dy,dx)*180/Math.PI : 0;
+      const driftX = distance ? -dx/distance*12 : 0;
+      const driftY = -10 + (distance ? -dy/distance*8 : 0);
+      const turn = direction + (mistPhase++ % 2 ? 9 : -9);
+      const mist = place('moon-mist', event.clientX, event.clientY, 800);
+      mist.animate([
+        { transform: 'translate3d(-50%,-50%,0) rotate('+direction+'deg) scale(.95,.9)', opacity: 0 },
+        { offset: .16, transform: 'translate3d(-50%,-50%,0) rotate('+direction+'deg) scale(1.08,1)', opacity: .2 },
+        { transform: 'translate3d(calc(-50% + '+driftX+'px),calc(-50% + '+driftY+'px),0) rotate('+turn+'deg) scale(1.8,1.45)', opacity: 0 }
+      ], { duration: 760, easing: easeOut, fill: 'both' });
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!allowed() || event.pointerType !== 'mouse' || event.button !== 0) return;
+      if ((event.target as Element)?.closest('input,textarea,[contenteditable=true],pre,code')) return;
+      const blooms = [...effects.keys()].filter(element => element.className === 'moon-bloom');
+      if (blooms.length >= 2) removeEffect(blooms[0]);
+      const bloom = place('moon-bloom', event.clientX, event.clientY, 1080);
+      const halo = document.createElement('span');
+      halo.className = 'moon-halo';
+      bloom.append(halo);
+      halo.animate([
+        { transform: 'translate3d(-50%,-50%,0) scale(.9)', opacity: 0 },
+        { offset: .14, transform: 'translate3d(-50%,-50%,0) scale(1.04)', opacity: .64 },
+        { transform: 'translate3d(-50%,-50%,0) scale(2.05)', opacity: 0 }
+      ], { duration: 820, easing: easeOut, fill: 'both' });
+      const veil = document.createElement('span');
+      veil.className = 'moon-veil';
+      bloom.append(veil);
+      veil.animate([
+        { transform: 'translate3d(-50%,-50%,0) scale(.92)', opacity: 0 },
+        { offset: .2, transform: 'translate3d(-50%,-50%,0) scale(1.18)', opacity: .52 },
+        { transform: 'translate3d(-50%,-50%,0) scale(2.3)', opacity: 0 }
+      ], { duration: 960, delay: 45, easing: easeOut, fill: 'both' });
+      const glint = document.createElement('span');
+      glint.className = 'moon-glint';
+      bloom.append(glint);
+      glint.animate([
+        { transform: 'translate3d(-50%,-50%,0) scale(.95)', opacity: .6 },
+        { transform: 'translate3d(-50%,-50%,0) scale(1.25)', opacity: 0 }
+      ], { duration: 180, easing: easeOut, fill: 'both' });
+    };
 
-	if (!siteWindow.__haloSiteEffects) {
-		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-		const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-		let canvas: HTMLCanvasElement | null = null;
-		let context: CanvasRenderingContext2D | null = null;
-		let frame = 0;
-		let points: TrailPoint[] = [];
-		let particles: Particle[] = [];
-		let lastPoint = { x: 0, y: 0, time: 0 };
-
-		const effectColor = () =>
-			getComputedStyle(document.documentElement).getPropertyValue('--secondary').trim() || '#bcb5a9';
-
-		const resize = () => {
-			if (!canvas || !context) return;
-			const ratio = Math.min(window.devicePixelRatio || 1, 2);
-			canvas.width = Math.round(window.innerWidth * ratio);
-			canvas.height = Math.round(window.innerHeight * ratio);
-			canvas.style.width = `${window.innerWidth}px`;
-			canvas.style.height = `${window.innerHeight}px`;
-			context.setTransform(ratio, 0, 0, ratio, 0, 0);
-		};
-
-		const ensureCanvas = () => {
-			if (canvas?.isConnected) return;
-			canvas = document.createElement('canvas');
-			canvas.className = 'pointer-effects-canvas';
-			canvas.setAttribute('aria-hidden', 'true');
-			Object.assign(canvas.style, {
-				position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '9998',
-			});
-			document.body.append(canvas);
-			context = canvas.getContext('2d');
-			resize();
-		};
-
-		const render = (now: number) => {
-			frame = 0;
-			if (!canvas || !context) return;
-			context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-			const color = effectColor();
-			points = points.filter((point) => now - point.born < 430);
-			particles = particles.filter((particle) => now - particle.born < 520);
-
-			for (const point of points) {
-				const progress = (now - point.born) / 430;
-				context.globalAlpha = (1 - progress) * 0.32;
-				context.fillStyle = color;
-				context.beginPath();
-				context.arc(point.x, point.y, Math.max(0.5, 2.7 * (1 - progress)), 0, Math.PI * 2);
-				context.fill();
-			}
-
-			for (const particle of particles) {
-				const seconds = (now - particle.born) / 1000;
-				const progress = (now - particle.born) / 520;
-				context.globalAlpha = (1 - progress) * 0.62;
-				context.fillStyle = color;
-				context.beginPath();
-				context.arc(
-					particle.x + particle.vx * seconds,
-					particle.y + particle.vy * seconds + 26 * seconds * seconds,
-					Math.max(0.5, 2.5 * (1 - progress)), 0, Math.PI * 2,
-				);
-				context.fill();
-			}
-			context.globalAlpha = 1;
-			if (points.length || particles.length) frame = requestAnimationFrame(render);
-		};
-
-		const requestRender = () => {
-			if (!frame) frame = requestAnimationFrame(render);
-		};
-
-		const onPointerMove = (event: PointerEvent) => {
-			if (reduceMotion.matches || !finePointer.matches || event.pointerType === 'touch') return;
-			ensureCanvas();
-			const now = performance.now();
-			const distance = Math.hypot(event.clientX - lastPoint.x, event.clientY - lastPoint.y);
-			if (distance < 10 && now - lastPoint.time < 28) return;
-			lastPoint = { x: event.clientX, y: event.clientY, time: now };
-			points.push({ x: event.clientX, y: event.clientY, born: now });
-			if (points.length > 28) points.shift();
-			requestRender();
-		};
-
-		const onPointerDown = (event: PointerEvent) => {
-			if (event.button !== 0 || reduceMotion.matches || !finePointer.matches) return;
-			ensureCanvas();
-			const ring = document.createElement('span');
-			ring.className = 'click-ring';
-			ring.style.left = `${event.clientX}px`;
-			ring.style.top = `${event.clientY}px`;
-			document.body.append(ring);
-			ring.animate([
-				{ transform: 'translate(-50%, -50%) scale(.72)', opacity: .72 },
-				{ transform: 'translate(-50%, -50%) scale(1.55)', opacity: 0 },
-			], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }).onfinish = () => ring.remove();
-			const now = performance.now();
-			for (let index = 0; index < 8; index += 1) {
-				const angle = (Math.PI * 2 * index) / 8;
-				particles.push({ x: event.clientX, y: event.clientY, vx: Math.cos(angle) * 42, vy: Math.sin(angle) * 42, born: now });
-			}
-			requestRender();
-		};
-
-		const bindTheme = () => {
+const bindTheme = () => {
 			document.querySelectorAll<HTMLButtonElement>('.theme-toggle:not([data-bound])').forEach((button) => {
 				button.dataset.bound = 'true';
 				button.addEventListener('click', () => {
@@ -139,20 +111,33 @@
 			});
 		};
 
-		const init = () => { ensureCanvas(); bindTheme(); enhanceCode(); };
-		const cleanup = () => {
-			if (frame) cancelAnimationFrame(frame);
-			frame = 0; points = []; particles = [];
-			canvas?.remove(); canvas = null; context = null;
-		};
-		siteWindow.__haloSiteEffects = { init, cleanup };
-		document.addEventListener('pointermove', onPointerMove, { passive: true });
-		document.addEventListener('pointerdown', onPointerDown, { passive: true });
-		window.addEventListener('resize', resize, { passive: true });
-		document.addEventListener('astro:before-swap', cleanup);
-		document.addEventListener('astro:page-load', init);
-	}
 
-	siteWindow.__haloSiteEffects.init();
+
+    const init = () => { bindTheme(); enhanceCode(); };
+    siteWindow.__haloSiteEffects = { init, cleanup };
+    document.addEventListener('pointermove', onPointerMove, { passive: true });
+    document.addEventListener('pointerdown', onPointerDown, { passive: true });
+    document.addEventListener('astro:before-swap', cleanup);
+    document.addEventListener('astro:page-load', init);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cleanup(); });
+    reduceMotion.addEventListener('change', cleanup);
+    finePointer.addEventListener('change', cleanup);
+  }
+  siteWindow.__haloSiteEffects.init();
 </script>
-
+<style is:global>
+  .moon-mist,.moon-bloom { position: fixed; z-index: 9998; pointer-events: none; }
+  .moon-bloom { width: 0; height: 0; }
+  .moon-mist { width: 58px; height: 30px; border-radius: 50%; opacity: 0; background: radial-gradient(ellipse at 32% 58%,rgba(var(--moon-rgb),.48),rgba(var(--moon-rgb),.14) 36%,transparent 72%),radial-gradient(ellipse at 67% 40%,rgba(var(--moon-rgb),.4),rgba(var(--moon-rgb),.09) 40%,transparent 73%),radial-gradient(ellipse at 50% 58%,rgba(var(--moon-rgb),.22),transparent 72%); }
+  .moon-halo,.moon-veil,.moon-glint { position: absolute; border-radius: 50%; opacity: 0; }
+  .moon-halo { width: 86px; height: 86px; background: radial-gradient(circle,rgba(var(--moon-rgb),.36),rgba(var(--moon-rgb),.18) 28%,rgba(var(--moon-rgb),.06) 52%,transparent 76%); }
+  .moon-veil { width: 94px; height: 94px; background: radial-gradient(circle,transparent 28%,rgba(var(--moon-rgb),.13) 47%,rgba(var(--moon-rgb),.06) 59%,transparent 77%); }
+  .moon-glint { width: 12px; height: 12px; background: radial-gradient(circle,rgba(var(--moon-rgb),.85),rgba(var(--moon-rgb),.3) 32%,transparent 72%); }
+  @media (hover: hover) and (pointer: fine) {
+    body { cursor: url('/cursors/lunar-pointer-v1.svg') 18 18, auto; }
+    a,button,[role='button'],summary,input[type='checkbox'],input[type='radio'],body .site-header .theme-toggle,body .copy-code { cursor: url('/cursors/lunar-link-v1.svg') 18 18, pointer; }
+    input:not([type='checkbox']):not([type='radio']),textarea,[contenteditable='true'],pre,code { cursor: text; }
+    [disabled],.socials .disabled { cursor: not-allowed; }
+  }
+  @media (prefers-reduced-motion: reduce), (pointer: coarse) { .moon-mist,.moon-bloom { display: none; } }
+</style>

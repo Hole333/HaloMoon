@@ -1,0 +1,143 @@
+<ocean-wallpaper class="home-wallpaper" aria-hidden="true">
+  <picture>
+    <source media="(max-width: 820px)" srcset="/wallpapers/ocean-frame-mobile-v2.webp" />
+    <img src="/wallpapers/ocean-frame-4k-v3.webp" width="3840" height="2160" alt="" loading="eager" fetchpriority="high" decoding="async" />
+  </picture>
+  <video muted loop playsinline preload="none" disablepictureinpicture tabindex="-1" data-src="/wallpapers/ocean-desktop-4k-v4.mp4"></video>
+</ocean-wallpaper>
+
+<script>
+  import moonTrack from '../data/moon-track.json';
+  class OceanWallpaper extends HTMLElement {
+    private controller?: AbortController;
+    private page?: HTMLElement;
+    private boundVideo?: HTMLVideoElement;
+    private refreshPlayback?: () => void;
+    connectedCallback() {
+      // Astro replaces parsed media during its body swap; bind after that swap finishes.
+      queueMicrotask(() => { if (this.isConnected) this.initialize(); });
+    }
+    initialize() {
+      const video = this.querySelector('video');
+      const page = this.closest('body');
+      if (!video || !this.isConnected || page !== document.body) return;
+      if (this.boundVideo === video && this.page === page && this.controller && !this.controller.signal.aborted) {
+        this.refreshPlayback?.();
+        return;
+      }
+      this.controller?.abort();
+      if (this.boundVideo && this.boundVideo !== video) {
+        this.boundVideo.pause();
+        this.boundVideo.removeAttribute('src');
+        this.boundVideo.load();
+      }
+      this.boundVideo = video;
+      video.defaultMuted = true;
+      video.muted = true;
+      this.controller = new AbortController();
+      const { signal } = this.controller;
+      this.page = page;
+      const caption = page.querySelector<HTMLElement>('.profile');
+      const mobile = matchMedia('(max-width: 820px), (hover: none), (pointer: coarse)');
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+      const connection = (navigator as Navigator & { connection?: EventTarget & { saveData?: boolean; effectiveType?: string } }).connection;
+      const allowVideo = () => !mobile.matches && !reduced.matches && !connection?.saveData;
+      const positionCaption = () => {
+        if (!caption || page.dataset.wallpaperMode !== 'video' || document.hidden) return;
+        const time = video.readyState >= 2 ? video.currentTime + 20 : 8;
+        let upper = moonTrack.findIndex(point => point[0] >= time);
+        if (upper < 0) upper = moonTrack.length - 1;
+        const a = moonTrack[Math.max(0, upper - 1)], b = moonTrack[upper];
+        const fraction = b[0] === a[0] ? 0 : Math.max(0, Math.min(1, (time-a[0])/(b[0]-a[0])));
+        const x = a[1] + (b[1]-a[1])*fraction, bottom = a[2] + (b[2]-a[2])*fraction;
+        const width = innerWidth, height = innerHeight, scale = Math.max(width/3840,height/2160);
+        const screenX = (width-3840*scale)/2 + x*3840*scale;
+        const screenBottom = (height-2160*scale)/2 + bottom*2160*scale;
+        const top = Math.max(110,Math.min(screenBottom+18,height-245));
+        caption.style.transform = 'translate3d('+screenX.toFixed(1)+'px,'+top.toFixed(1)+'px,0) translateX(-50%)';
+      };
+      const playWhenBuffered = () => {
+        if (!allowVideo() || document.hidden || signal.aborted || video.readyState < 4) return;
+        video.defaultMuted = true;
+        video.muted = true;
+        if (!video.paused) { this.dataset.playing = 'true'; return; }
+        video.play().catch(() => { if (!signal.aborted) this.dataset.playing = 'false'; });
+      };
+      const update = () => {
+        if (signal.aborted || !this.isConnected) return;
+        video.defaultMuted = true;
+        video.muted = true;
+        if (!allowVideo()) {
+          video.pause();
+          this.dataset.playing = 'false';
+          this.dataset.mode = 'still';
+          page.dataset.wallpaperMode = 'still';
+          caption?.style.removeProperty('transform');
+          if (video.hasAttribute('src')) { video.removeAttribute('src'); video.load(); }
+          return;
+        }
+        this.dataset.mode = 'video';
+        page.dataset.wallpaperMode = 'video';
+        positionCaption();
+        if (document.hidden) { video.pause(); return; }
+        if (!video.hasAttribute('src')) {
+          video.muted = true;
+          video.preload = 'auto';
+          video.src = video.dataset.src!;
+          video.load();
+        }
+        playWhenBuffered();
+      };
+      this.refreshPlayback = update;
+      video.addEventListener('canplaythrough', playWhenBuffered, { signal });
+      video.addEventListener('playing', () => { this.dataset.playing = 'true'; positionCaption(); }, { signal });
+      video.addEventListener('timeupdate', positionCaption, { signal });
+      window.addEventListener('resize', positionCaption, { signal, passive: true });
+      video.addEventListener('error', () => { this.dataset.playing = 'false'; }, { signal });
+      mobile.addEventListener('change', update, { signal });
+      reduced.addEventListener('change', update, { signal });
+      connection?.addEventListener('change', update, { signal });
+      document.addEventListener('visibilitychange', update, { signal });
+      update();
+    }
+    disconnectedCallback() {
+      this.controller?.abort();
+      this.refreshPlayback = undefined;
+      this.boundVideo = undefined;
+      this.page?.removeAttribute('data-wallpaper-mode');
+      this.page?.querySelector<HTMLElement>('.profile')?.style.removeProperty('transform');
+      const video = this.querySelector('video');
+      if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
+    }
+  }
+  if (!customElements.get('ocean-wallpaper')) customElements.define('ocean-wallpaper', OceanWallpaper);
+
+  const restartWallpaper = () => {
+    document.querySelectorAll<OceanWallpaper>('ocean-wallpaper').forEach(wallpaper => {
+      const video = wallpaper.querySelector('video');
+      if (video) { video.defaultMuted = true; video.muted = true; }
+      // Also repair open tabs whose custom-element registry still holds the earlier class.
+      if (typeof wallpaper.initialize === 'function') wallpaper.initialize();
+      else wallpaper.connectedCallback();
+      if (video && !video.paused && video.readyState >= 2) wallpaper.dataset.playing = 'true';
+    });
+  };
+  const navigationWindow = window as Window & { __haloWallpaperNavigationBound?: boolean };
+  if (!navigationWindow.__haloWallpaperNavigationBound) {
+    navigationWindow.__haloWallpaperNavigationBound = true;
+    document.addEventListener('astro:after-swap', restartWallpaper);
+    document.addEventListener('astro:page-load', restartWallpaper);
+    window.addEventListener('pageshow', restartWallpaper);
+  }
+  restartWallpaper();
+</script>
+
+<style>
+  .home-wallpaper { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #031726; }
+  picture, img, video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+  img, video { object-fit: cover; object-position: center; border-radius: 0; }
+  video { opacity: 0; transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+  [data-playing='true'] video { opacity: 1; }
+  .home-wallpaper::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,rgba(1,12,24,.66),transparent 22%,transparent 78%,rgba(1,12,24,.7)),radial-gradient(ellipse 32rem 9rem at 50% 57%,rgba(1,12,24,.58),rgba(1,12,24,.24) 65%,transparent); }
+  @media (max-width: 820px), (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) { video { display: none; transition: none; } }
+</style>

@@ -2,6 +2,7 @@
 interface Props {
 	size?: number | string;
 	animated?: boolean;
+	animateSmall?: boolean;
 	class?: string;
 	alt?: string;
 }
@@ -9,11 +10,12 @@ interface Props {
 const {
 	size = 150,
 	animated = true,
+	animateSmall = false,
 	class: className = '',
 	alt = '躺平企鹅头像',
 } = Astro.props;
 const cssSize = typeof size === 'number' ? `${size}px` : size;
-const small = typeof size === 'number' && size < 72;
+const small = typeof size === 'number' && size < 72 && !animateSmall;
 ---
 
 <span

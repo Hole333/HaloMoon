@@ -1,4 +1,5 @@
 ---
+import HomeWallpaper from '../components/HomeWallpaper.astro';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
@@ -11,13 +12,27 @@ const socials=[
 	{key:'x',label:'X / Twitter',href:SOCIAL_LINKS.x},
 	{key:'telegram',label:'Telegram',href:SOCIAL_LINKS.telegram},
 	{key:'whatsapp',label:'WhatsApp',href:SOCIAL_LINKS.whatsapp},
-	{key:'rss',label:'RSS',href:SOCIAL_LINKS.rss},
 ] as const;
 ---
-<!doctype html><html lang="zh-CN"><head><BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION}/></head><body class="home-page"><Header/><main class="profile-main"><section class="profile" aria-labelledby="profile-name"><LazyTuxAvatar class="profile-avatar" size={150} animated={true} alt="躺平企鹅头像" /><h1 id="profile-name">Halo Moon</h1><TypewriterText text="欢迎来到我的小站！" /><nav class="socials" aria-label="社交链接">{socials.map(item=>item.href?<a href={item.href} aria-label={item.label} title={item.label} target={item.href.startsWith('http')?'_blank':undefined} rel={item.href.startsWith('http')?'noreferrer':undefined}><SocialIcon name={item.key}/></a>:<span class="disabled" aria-label={`${item.label} 尚未配置`} title={`${item.label}：在 src/consts.ts 中配置链接`}><SocialIcon name={item.key}/></span>)}</nav></section></main><Footer/></body></html>
-<style>.profile-main{display:grid;place-items:center;min-height:calc(100vh - var(--header-height) - var(--footer-height));padding-block:2rem}.profile{text-align:center}.profile :global(.profile-avatar){margin-bottom:1rem}.profile h1{margin:.2rem 0 .35rem;font-size:2.15rem}.socials{display:flex;justify-content:center;align-items:center;gap:1.05rem;margin-top:1.15rem}.socials a,.socials span{display:grid;place-items:center;width:30px;height:30px;color:var(--secondary);transition:color 150ms ease,transform 150ms ease}.socials :global(svg){width:22px;height:22px}.socials a:hover{color:var(--primary);transform:translateY(-2px)}.socials .disabled{cursor:not-allowed;opacity:.42}@media(max-width:640px){.profile :global(.profile-avatar){--lazy-tux-size:120px!important}.profile h1{font-size:1.85rem}}</style>
-
-
-
-
-
+<!doctype html><html lang="zh-CN"><head><BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION}/></head><body class="home-page"><HomeWallpaper/><Header><LazyTuxAvatar slot="avatar" class="header-avatar" size={52} animated={true} animateSmall={true} alt="HaloMoon 动态企鹅标志" /></Header><main class="profile-main"><section class="profile" aria-labelledby="profile-name"><LazyTuxAvatar class="profile-avatar" size={150} animated={true} alt="躺平企鹅头像" /><h1 id="profile-name">Halo Moon</h1><TypewriterText text="欢迎来到我的小站！" /><nav class="socials" aria-label="社交链接">{socials.map(item=>item.href?<a href={item.href} aria-label={item.label} title={item.label} target={item.href.startsWith('http')?'_blank':undefined} rel={item.href.startsWith('http')?'noreferrer':undefined}><SocialIcon name={item.key}/></a>:<span class="disabled" aria-label={`${item.label} 尚未配置`} title={`${item.label}：在 src/consts.ts 中配置链接`}><SocialIcon name={item.key}/></span>)}</nav></section></main><Footer/></body></html>
+<style>
+.home-page{position:relative;isolation:isolate;overflow-x:hidden;background:#031726;--primary:#f5fbff;--secondary:#e1f3ff;--content:#f0f8ff;--border-soft:rgba(211,239,255,.4);--surface-muted:rgba(5,32,51,.76)}
+.profile-main{display:grid;place-items:center;min-height:calc(100vh - var(--header-height) - var(--footer-height));padding-block:2rem}.profile{text-align:center}.profile :global(.profile-avatar){margin-bottom:1rem}.profile h1{margin:.2rem 0 .35rem;font-size:2.15rem}.socials{display:flex;justify-content:center;align-items:center;gap:1.05rem;margin-top:1.15rem}.socials a,.socials span{display:grid;place-items:center;width:30px;height:30px;color:var(--secondary);transition:color 150ms ease,transform 150ms ease}.socials :global(svg){width:22px;height:22px}.socials a:hover{color:var(--primary);transform:translateY(-2px)}.socials .disabled{cursor:not-allowed;opacity:.42}
+.profile h1{font-weight:800;text-shadow:0 2px 4px #00101d,0 4px 22px #00101ddd}
+.profile :global(.typewriter-text){color:#f5fbff;font-weight:800;text-shadow:0 2px 3px #00101d,0 3px 16px #00101dee}
+.home-page :global(.wordmark),.home-page :global(.internal-links a),.home-page :global(.site-footer){text-shadow:0 2px 8px #00101df2}
+.home-page :global(.internal-links a){font-weight:600}
+.home-page :global(.theme-toggle){background:rgba(4,28,44,.65);border-color:rgba(211,239,255,.5)}
+.socials a{color:#f0fbff;filter:drop-shadow(0 2px 3px #00101d)}
+.socials .disabled{opacity:.58}
+.home-page :global(a:focus-visible),.home-page :global(button:focus-visible){outline:2px solid #b6edff;outline-offset:4px}
+@media(max-width:640px){.profile :global(.profile-avatar){--lazy-tux-size:120px!important}.profile h1{font-size:1.85rem}}
+.home-page :global(.header-avatar){display:none;flex:none}
+.home-page[data-wallpaper-mode='video'] :global(.header-avatar){display:inline-block}
+.home-page[data-wallpaper-mode='video'] .profile :global(.profile-avatar){display:none}
+.home-page[data-wallpaper-mode='video'] .profile{position:fixed;left:0;top:0;z-index:1;width:min(90vw,620px);display:flex;flex-direction:column;align-items:center;transition:transform 200ms linear}
+.home-page[data-wallpaper-mode='video'] .profile :global(.typewriter-text){order:0;font-size:clamp(1.55rem,2.4vw,2.2rem);margin:0;line-height:1.35}
+.home-page[data-wallpaper-mode='video'] .profile h1{order:1;font-size:1.12rem;letter-spacing:.08em;margin:.65rem 0 .15rem;color:#e1f3ff}
+.home-page[data-wallpaper-mode='video'] .socials{order:2;margin-top:.85rem}
+@media(prefers-reduced-motion:reduce){.profile{transition:none!important}}
+</style>

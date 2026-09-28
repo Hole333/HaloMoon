@@ -1,5 +1,5 @@
 ---
-interface Props { name: 'github'|'x'|'telegram'|'whatsapp'|'rss'; }
+interface Props { name: 'github'|'x'|'telegram'|'whatsapp'; }
 const { name } = Astro.props;
 ---
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -7,5 +7,4 @@ const { name } = Astro.props;
 	{name==='x'&&<path d="M4 3l16 18M20 3L4 21"/>}
 	{name==='telegram'&&<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>}
 	{name==='whatsapp'&&<><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 21l2.1-5.2A8.5 8.5 0 1 1 21 11.5Z"/><path d="M9.2 7.8c.3 2.7 2.3 4.8 5 5.3l1.3-1.3c.3-.3.6-.4 1-.2l2 .9"/></>}
-	{name==='rss'&&<><circle cx="5" cy="19" r="1" fill="currentColor" stroke="none"/><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/></>}
 </svg>
